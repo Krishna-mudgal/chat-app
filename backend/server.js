@@ -3,6 +3,8 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 const { connectDB } = require("./db");
 const { userRouter } = require("./routes/user");
+const { channelRouter } = require("./routes/channel");
+const { auth } = require("./middleware/authMiddleware")
 const { createServer } = require("http");
 const { Server } = require("socket.io");
 require("dotenv").config();
@@ -28,5 +30,6 @@ app.use(
 );
 
 app.use("/api", userRouter);
+app.use("/api/channels", auth, channelRouter);
 
 server.listen(5000, () => console.log("Server running on 5000"));
