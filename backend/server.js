@@ -4,6 +4,7 @@ const cors = require("cors");
 const { connectDB } = require("./db");
 const { userRouter } = require("./routes/user");
 const { channelRouter } = require("./routes/channel");
+const { messageRouter } = require("./routes/message");
 const { auth } = require("./middleware/authMiddleware")
 const { createServer } = require("http");
 const { Server } = require("socket.io");
@@ -31,5 +32,6 @@ app.use(
 
 app.use("/api", userRouter);
 app.use("/api/channels", auth, channelRouter);
+app.use("/api/messages", auth, messageRouter);
 
 server.listen(5000, () => console.log("Server running on 5000"));
