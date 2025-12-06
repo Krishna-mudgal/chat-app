@@ -9,25 +9,74 @@ export default function ChatRoom({ channel }) {
   const [hasMore, setHasMore] = useState(true);
   const [showNewMessageIndicator, setShowNewMessageIndicator] = useState(false);
   const [typingUsers, setTypingUsers] = useState([]);
+  const [socketConnected, setSocketConnected] = useState(false);
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [channelMembers, setChannelMembers] = useState([]);
 
   const messagesRef = useRef(null);
   const messagesEndRef = useRef(null);
   const socket = useRef(null);
-
   let typingTimeout = useRef(null);
 
-  // ==========================
-  // Connect socket
-  // ==========================
-  useEffect(() => {
-    socket.current = io("http://localhost:5000", { withCredentials: true });
+  const fetchChannelMembers = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/channels/${channel._id}`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+      
+      if (!res.ok) return;
 
-    socket.current.emit("joinChannel", channel._id);
+      if (channel.type === "private" && data.members.length === 0) {
+        setChannelMembers([channel.admin]);
+      } else {
+        setChannelMembers(data.members || []);
+      }
+
+      setShowMembersModal(true);
+    } catch (err) {
+      console.error("Failed to fetch members:", err);
+    }
+  };
+
+  // Socket Connection 
+  useEffect(() => {
+    if (!channel?._id) return;
+
+    console.log("🔌 Connecting socket for channel:", channel._id);
+
+    socket.current = io("http://localhost:5000", {
+      withCredentials: true,
+      transports: ["websocket"],
+    });
+
+    socket.current.on("connect", () => {
+      console.log("✅ Socket CONNECTED");
+      setSocketConnected(true);
+      socket.current.emit("joinChannel", { channelId: channel._id });
+    });
+
+    socket.current.on("connect_error", (err) => {
+      console.error("❌ Socket connect error:", err.message);
+      setSocketConnected(false);
+    });
+
+    socket.current.on("disconnect", (reason) => {
+      console.log("🔌 Socket disconnected:", reason);
+      setSocketConnected(false);
+    });
 
     socket.current.on("newMessage", (msg) => {
-      setMessages((prev) => [...prev, msg]);
+      console.log("📨 SERVER MESSAGE:", msg);
+      
+      setMessages((prev) => {
+        const hasTemp = prev.some(m => m.temp);
+        if (hasTemp) {
+          return [...prev.filter(m => !m.temp), msg];
+        }
+        return [...prev, msg];
+      });
 
-      // Auto-scroll only if near bottom
       const el = messagesRef.current;
       if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 50) {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,7 +85,10 @@ export default function ChatRoom({ channel }) {
       }
     });
 
-    socket.current.on("onlineUsers", (users) => setOnlineUsers(users));
+    socket.current.on("onlineUsers", (users) => {
+      console.log("👥 Online users:", users);
+      setOnlineUsers(users);
+    });
 
     socket.current.on("typing", (user) => {
       setTypingUsers((prev) => {
@@ -49,28 +101,37 @@ export default function ChatRoom({ channel }) {
       setTypingUsers((prev) => prev.filter((u) => u !== user.username));
     });
 
-    return () => socket.current.disconnect();
-  }, [channel._id]);
+    return () => {
+      console.log("🔌 Disconnecting socket");
+      socket.current?.disconnect();
+    };
+  }, [channel?._id]);
 
-  // ==========================
-  // Load messages (pagination)
-  // ==========================
+
   const loadMessages = async (pageNum = 1) => {
     try {
+      console.log("📥 Loading page:", pageNum);
       const res = await fetch(
-        `http://localhost:5000/api/channels/${channel._id}/messages?page=${pageNum}`,
+        `http://localhost:5000/api/messages/${channel._id}?page=${pageNum}`,
         { credentials: "include" }
       );
       const data = await res.json();
+      
       if (data.messages && data.messages.length > 0) {
-        if (pageNum === 1) setMessages(data.messages);
-        else setMessages((prev) => [...data.messages, ...prev]);
+        if (pageNum === 1) {
+          const recentSocketMsg = messages[messages.length - 1]?.temp;
+          if (!recentSocketMsg) {
+            setMessages(data.messages);
+          }
+        } else {
+          setMessages((prev) => [...data.messages, ...prev]);
+        }
         setPage(pageNum);
       } else {
         setHasMore(false);
       }
     } catch (err) {
-      console.error(err);
+      console.error("❌ Load error:", err);
     }
   };
 
@@ -81,134 +142,205 @@ export default function ChatRoom({ channel }) {
     loadMessages(1);
   }, [channel._id]);
 
-  // ==========================
-  // Infinite scroll
-  // ==========================
   const handleScroll = () => {
     const el = messagesRef.current;
     if (!el) return;
 
-    // Load older messages when scrolled to top
     if (el.scrollTop === 0 && hasMore) {
       const oldHeight = el.scrollHeight;
       loadMessages(page + 1).then(() => {
         const newHeight = el.scrollHeight;
-        el.scrollTop = newHeight - oldHeight; // maintain scroll position
+        el.scrollTop = newHeight - oldHeight;
       });
     }
   };
 
-  // ==========================
-  // Handle input & typing
-  // ==========================
   const handleInputChange = (e) => {
     setNewMessage(e.target.value);
 
-    socket.current.emit("typing", { channelId: channel._id });
+    if (socketConnected) {
+      socket.current.emit("typing", { channelId: channel._id });
 
-    clearTimeout(typingTimeout.current);
-    typingTimeout.current = setTimeout(() => {
-      socket.current.emit("stopTyping", { channelId: channel._id });
-    }, 1000); // stop typing after 1s
+      clearTimeout(typingTimeout.current);
+      typingTimeout.current = setTimeout(() => {
+        socket.current.emit("stopTyping", { channelId: channel._id });
+      }, 1000);
+    }
   };
 
-  // ==========================
-  // Send message
-  // ==========================
   const handleSend = () => {
-    if (!newMessage.trim()) return;
-    const msgObj = { channelId: channel._id, text: newMessage };
-    socket.current.emit("sendMessage", msgObj);
+    if (!newMessage.trim() || !socketConnected) return;
+
+    const tempId = `temp-${Date.now()}`;
+    const optimisticMsg = {
+      _id: tempId,
+      text: newMessage.trim(),
+      sender: { username: "You" },
+      temp: true
+    };
+
+    console.log("📤 OPTIMISTIC:", optimisticMsg);
+    setMessages((prev) => [...prev, optimisticMsg]);
     setNewMessage("");
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+
+    const msgObj = { channelId: channel._id, text: newMessage.trim() };
+    socket.current.emit("sendMessage", msgObj);
     socket.current.emit("stopTyping", { channelId: channel._id });
   };
 
-  // ==========================
-  // Scroll to bottom on load
-  // ==========================
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   return (
     <div className="flex flex-col h-full bg-[#1e1f22] relative">
-      {/* Header */}
-      <div className="bg-[#2b2d31] p-4 flex justify-between items-center">
-        <h2 className="text-lg font-bold">#{channel.name}</h2>
-        {channel.type === "public" ? (
-          <div className="text-sm text-gray-400">
-            Members: {onlineUsers.length} online
-          </div>
-        ) : (
-          <div className="text-sm text-gray-400">
-            Admin: {channel.admin?.username || "Admin"}
-          </div>
-        )}
+      <div 
+        className="bg-[#2b2d31] p-4 flex justify-between items-center cursor-pointer hover:bg-[#36393f] transition-all group"
+        onClick={fetchChannelMembers}
+      >
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-white group-hover:text-indigo-400 transition-colors">
+            #{channel.name}
+          </h2>
+          <svg 
+            className="w-4 h-4 text-gray-400 group-hover:text-indigo-300 transition-colors" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+        
+        {/* <div className="flex items-center gap-2">
+          {channel.type === "public" ? (
+            <div className="text-sm text-gray-400">
+              {onlineUsers.length} online
+            </div>
+          ) : (
+            <div className="text-sm text-gray-400">
+              Admin
+            </div>
+          )}
+          <div className={`w-2 h-2 rounded-full ${socketConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+        </div> */}
       </div>
 
-      {/* Messages */}
+      {showMembersModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-end z-50 md:items-center p-4">
+          <div className="bg-[#2b2d31] w-full max-w-md max-h-[70vh] rounded-lg shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-[#36393f] flex justify-between items-center">
+              <h3 className="text-xl font-bold text-white">
+                {channel.type === "public" ? "Members" : "Admin"}
+              </h3>
+              <button
+                onClick={() => setShowMembersModal(false)}
+                className="text-gray-400 hover:text-white text-xl p-1 hover:bg-[#36393f] rounded-full transition-all"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="p-4 max-h-[50vh] overflow-y-auto">
+              {channelMembers.length === 0 ? (
+                  <div className="text-center py-12 text-gray-400">
+                    {channel.type === "public" ? "No members" : "Loading..."}
+                  </div>
+                ) : (
+                  channelMembers.map((member) => (
+                    <div key={member._id} className="flex items-center gap-3 p-3 hover:bg-[#36393f] rounded-lg mb-2">
+                      <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
+                        {member.username?.[0]?.toUpperCase() || "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">{member.username}</p>
+                        {member.online !== undefined && (
+                          <p className="text-sm text-gray-400">
+                            {member.online ? (
+                              <span className="flex items-center gap-1">
+                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                Online
+                              </span>
+                            ) : (
+                              `Last seen recently`
+                            )}
+                          </p>
+                        )}
+                        {member.username === channel.admin?.username && (
+                          <p className="text-sm text-purple-400">Channel Admin</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         ref={messagesRef}
         className="flex-1 overflow-y-auto p-4 space-y-2"
         onScroll={handleScroll}
       >
-        {messages.map((msg) => (
-          <div key={msg._id} className="flex flex-col">
-            <span className="text-sm text-gray-400">{msg.sender.username}</span>
-            <span className="text-white">{msg.text}</span>
+        {messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <p>No messages yet. Be the first to chat!</p>
           </div>
-        ))}
+        ) : (
+          messages.map((msg, index) => (
+            <div key={msg._id || index} className="flex flex-col">
+              <span className="text-sm text-gray-400">
+                {msg?.sender?.username || "Unknown"}
+              </span>
+              <span className="text-white">{msg?.text || "No message"}</span>
+            </div>
+          ))
+        )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Typing Indicator */}
       {typingUsers.length > 0 && (
-        <div className="text-gray-400 text-sm px-4">
+        <div className="text-gray-400 text-sm px-4 pb-2">
           {typingUsers.join(", ")} {typingUsers.length > 1 ? "are" : "is"} typing...
         </div>
       )}
+      {!socketConnected && (
+        <div className="text-yellow-400 text-xs px-4 py-1 text-center bg-yellow-500/10">
+          Reconnecting...
+        </div>
+      )}
 
-      {/* New Message Indicator */}
       {showNewMessageIndicator && (
         <div
-          className="absolute bottom-20 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-indigo-600 rounded cursor-pointer"
+          className="absolute bottom-20 left-1/2 transform -translate-x-1/2 px-4 py-2 bg-indigo-600 rounded cursor-pointer z-10 shadow-lg"
           onClick={() => {
             messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
             setShowNewMessageIndicator(false);
           }}
         >
-          New Messages
+          ↓ New Messages
         </div>
       )}
 
-      {/* Input */}
       <div className="p-4 bg-[#2b2d31] flex gap-2">
         <input
-          className="flex-1 p-2 rounded bg-[#313338] text-white"
-          placeholder="Type a message..."
+          className="flex-1 p-2 rounded bg-[#313338] text-white focus:outline-none focus:ring-2 focus:ring-indigo-600 disabled:bg-gray-700"
+          placeholder={socketConnected ? "Type a message..." : "Connecting..."}
           value={newMessage}
           onChange={handleInputChange}
           onKeyDown={(e) => e.key === "Enter" && handleSend()}
+          disabled={!socketConnected}
         />
         <button
-          className="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700"
+          className="px-4 py-2 bg-indigo-600 rounded hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
           onClick={handleSend}
+          disabled={!socketConnected || !newMessage.trim()}
         >
           Send
         </button>
       </div>
-
-      {/* Online Users (only public) */}
-      {channel.type === "public" && (
-        <aside className="absolute top-16 right-0 w-56 bg-[#2b2d31] p-2">
-          <h3 className="font-bold mb-2">Online Users</h3>
-          {onlineUsers.map((user) => (
-            <div key={user._id} className="text-gray-200 text-sm">
-              {user.username} {user.online ? "(Online)" : `(Last seen: ${user.lastSeen})`}
-            </div>
-          ))}
-        </aside>
-      )}
     </div>
   );
 }

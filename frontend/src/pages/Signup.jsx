@@ -14,7 +14,7 @@ export default function Signup() {
       const res = await fetch("http://localhost:5000/api/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: "include", // important for sending/receiving cookies
+        credentials: "include",
         body: JSON.stringify(form),
       });
 
@@ -23,7 +23,6 @@ export default function Signup() {
       if (!res.ok) {
         alert(data.message || "Signup failed");
       } else {
-        // Cookie is automatically set by backend, no need to store token here
         navigate("/channels");
       }
     } catch (err) {
@@ -37,7 +36,18 @@ export default function Signup() {
   return (
     <div className="flex justify-center items-center h-screen bg-[#1e1f22]">
       <form className="bg-[#2b2d31] p-6 rounded w-80" onSubmit={handleSignup}>
-        <h1 className="text-xl font-bold mb-4 text-gray-200">Create Account</h1>
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-[#36393f]">
+          <h1 className="text-xl font-bold text-gray-200">Create Account</h1>
+          
+          <button
+            type="button"
+            onClick={() => navigate("/")}
+            className="text-gray-400 hover:text-white text-xl p-1 hover:bg-[#36393f] rounded-full transition-all w-8 h-8 flex items-center justify-center"
+            title="Close"
+          >
+            ×
+          </button>
+        </div>
 
         <input
           className="w-full mb-3 p-2 rounded bg-[#313338] text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600"
@@ -61,6 +71,18 @@ export default function Signup() {
         >
           {loading ? "Signing Up..." : "Sign Up"}
         </button>
+
+        <div className="text-center mt-4">
+          <p className="text-gray-400 text-sm mb-2">Already have an account?
+            <button 
+              type="button"
+              onClick={() => navigate("/login")}
+              className="text-indigo-400 hover:text-indigo-300 font-medium text-sm transition-colors"
+            >
+              Login here
+            </button>
+          </p>
+        </div>
       </form>
     </div>
   );

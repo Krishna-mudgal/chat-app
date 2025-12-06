@@ -13,8 +13,9 @@ const userSchema = mongoose.Schema({
     lastSeen : {
         type: Date,
         default: Date.now()
-    }
-}, {timseStamp: true});
+    },
+    online: { type: Boolean, default: false }, 
+}, {timestamps: true});
 
 const userModel = mongoose.model("user", userSchema);
 module.exports = {

@@ -1,15 +1,18 @@
 const { messageModel } = require("../models/message");
 const { channelModel } = require("../models/channel");
+const mongoose = require("mongoose");
 
 const handleGetMessages = async (req, res) => {
     try {
         const { channelId } = req.params;
         const { page = 1, limit = 20 } = req.query;
 
+        // console.log("Getting messages for channelId:", channelId);
+
         const channel = await channelModel.findById(channelId);
         if (!channel) return res.status(404).json({ message: "Channel not found" });
 
-        const messages = await messageModel.find({ channelId }).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(parseInt(limit)).populate("sender", "username");
+        const messages = await messageModel.find({ channelId : new mongoose.Types.ObjectId(channelId) }).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(parseInt(limit)).populate({ path: "sender", select: "username" });
 
         res.json({ messages: messages.reverse() });
     } catch (err) {

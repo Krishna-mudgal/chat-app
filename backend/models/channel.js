@@ -21,7 +21,7 @@ const channelSchema = mongoose.Schema({
     members: [{
         type: mongoose.Schema.Types.ObjectId, ref: "user"
     }]
-}, {timeStamp: true});
+}, {timestamps: true});
 
 const channelModel = mongoose.model("channel", channelSchema);
 module.exports = {channelModel};

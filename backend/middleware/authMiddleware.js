@@ -12,7 +12,7 @@ const auth = async (req, res, next) => {
     try {
         const decoded = jwt.verify(token, process.env.SECRET_KEY);
 
-        const user = await userModel.findById(decoded.userId);
+        const user = await userModel.findById(decoded._id);
         if(!user) return res.status(404).json({
             message: "Authentication failed"
         })

@@ -64,7 +64,7 @@ const handleJoinChannel = async (req, res) => {
 
 const handleGetMyChannels = async (req, res) => {
     try {
-        const channels = await channelModel.find({ members: req.user._id }).select("-password").sort({ updatedAt: -1 }).populate("admin", "username");
+        const channels = await channelModel.find({ members: req.user._id }).select("-password").populate("admin", "username").populate("members", "username").sort({ updatedAt: -1 });
 
         res.json({ channels });
     } catch (err) {
@@ -85,25 +85,20 @@ const handleGetChannelInfo = async (req, res) => {
         const userId = req.user._id.toString();
         const isAdmin = channel.admin._id.toString() === userId;
 
-        let channelObj = channel.toObject();
-
         if (channel.type === "private") {
-
             if (isAdmin) {
-                await channel.populate("members", "username lastSeen");
-                channelObj = channel.toObject();
+                await channel.populate("members", "username lastSeen online");
             } else {
-                channelObj.members = [];
+                channel.members = [];
             }
-        } 
-        else {
-            await channel.populate("members", "username lastSeen");
-            channelObj = channel.toObject();
+        } else {
+            await channel.populate("members", "username lastSeen online");
         }
 
+        const channelObj = channel.toObject();
         delete channelObj.password;
 
-        res.json({ channel: channelObj });
+        res.json(channelObj);
   } catch (err) {
     console.error("getChannelById error:", err);
     res.status(500).json({ message: "Server error" });
@@ -112,7 +107,7 @@ const handleGetChannelInfo = async (req, res) => {
 
 const handleCheckChannelType = async (req, res) => {
     try {
-        const { name } = req.body;
+        const { name } = req.query;
         if (!name) return res.status(400).json({ message: "Name required" });
 
         const channel = await channelModel.findOne({ name: name.trim() });

@@ -6,101 +6,191 @@ const { userRouter } = require("./routes/user");
 const { channelRouter } = require("./routes/channel");
 const { messageRouter } = require("./routes/message");
 const { messageModel } = require("./models/message");
-const { auth } = require("./middleware/authMiddleware")
+const { userModel } = require("./models/user");
+const { auth } = require("./middleware/authMiddleware");
 const { createServer } = require("http");
 const { Server } = require("socket.io");
+const cookie = require("cookie");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-    cors: {
+  cors: {
     origin: "http://localhost:5173",
     credentials: true,
+    methods: ["GET", "POST"]
   }
 });
 
 const onlineUsers = {};
 
-io.on("connection", (socket) => {
-  console.log("New socket connected:", socket.id);
+io.use((socket, next) => {
+  try {
+    const cookies = cookie.parse(socket.handshake.headers.cookie || "");
+    const token = cookies.token;
+    
+    if (!token) {
+    //   console.log("No token in cookies");
+      return next(new Error("No auth token"));
+    }
 
-  socket.on("joinChannel", async ({ channelId, userId, username }) => {
-    if (!onlineUsers[userId]) onlineUsers[userId] = { socketId : socket.id, username, channels: [] };
-    onlineUsers[userId].channels.push(channelId);
+    const decoded = jwt.verify(token, process.env.SECRET_KEY);
+    
+    socket.user = {
+      _id: decoded._id || decoded.userId,
+      username: decoded.username,
+    };
 
+    // console.log("Socket authenticated:", socket.user);
+    next();
+  } catch (err) {
+    console.error("Socket Auth Error:", err.message);
+    next(new Error("Authentication failed"));
+  }
+});
+
+io.on("connection", async (socket) => {
+//   console.log("Socket connected:", socket.id);
+  
+  if (!socket.user) {
+    console.log("No user - disconnecting");
+    socket.disconnect();
+    return;
+  }
+
+  const userId = socket.user._id;
+  const username = socket.user.username;
+
+  // Mark user online
+  try {
+    await userModel.findByIdAndUpdate(userId, { 
+      online: true, 
+      lastSeen: new Date() 
+    });
+    // console.log("User marked online:", username);
+  } catch (err) {
+    console.error("Failed to update online status:", err);
+  }
+
+  if (!onlineUsers[userId]) {
+    onlineUsers[userId] = { socketId: socket.id, username, channels: [] };
+  } else {
+    onlineUsers[userId].socketId = socket.id;
+  }
+
+  // Join channel
+  socket.on("joinChannel", ({ channelId }) => {
+    // console.log("joinChannel:", { userId, channelId });
+    
     socket.join(channelId);
 
-    const usersInChannel = Object.values(onlineUsers)
-      .filter(u => u.channels.includes(channelId))
-      .map(u => ({ username: u.username, _id: u.userId, online: true }));
+    if (!onlineUsers[userId].channels.includes(channelId)) {
+      onlineUsers[userId].channels.push(channelId);
+    }
+
+    const usersInChannel = Object.keys(onlineUsers)
+      .filter((id) => onlineUsers[id].channels.includes(channelId))
+      .map((id) => ({
+        _id: id,
+        username: onlineUsers[id].username,
+        online: true,
+      }));
 
     io.to(channelId).emit("onlineUsers", usersInChannel);
-
-    console.log(`${username} joined channel ${channelId}`);
+    // console.log(`${username} joined channel ${channelId}`);
   });
 
-  socket.on("sendMessage", async ({ channelId, senderId, text }) => {
+  // Send message - Sender + Room
+  socket.on("sendMessage", async ({ channelId, text }) => {
+    // console.log("sendMessage RECEIVED:", { userId, channelId, text: text.slice(0, 20) + "..." });
+    
     try {
       const message = await messageModel.create({
-        sender: senderId,
-        channel: channelId,
-        content: text,
+        sender: userId,
+        channelId,
+        text: text.trim(),
       });
-
-      const populatedMessage = await message.populate("sender", "username");
-
-      io.to(channelId).emit("newMessage", populatedMessage);
+      
+    //   console.log("Message SAVED:", message._id);
+      
+      // FIXED: Correct populate syntax for single document
+      await message.populate("sender", "username");
+      
+    //   console.log("Populated sender:", message.sender?.username);
+      
+      // EMIT TO ROOM (others) + SENDER
+      socket.to(channelId).emit("newMessage", message);  // Others in room
+      socket.emit("newMessage", message);                 // Sender gets own message
+      
+    //   console.log("Message sent to room + sender:", channelId);
     } catch (err) {
-      console.error("Error sending message:", err);
+    //   console.error("Send message ERROR:", err);
     }
   });
 
   // Typing indicator
-  socket.on("typing", ({ channelId, username }) => {
+  socket.on("typing", ({ channelId }) => {
     socket.to(channelId).emit("typing", { username });
   });
 
-  socket.on("stopTyping", ({ channelId, username }) => {
+  socket.on("stopTyping", ({ channelId }) => {
     socket.to(channelId).emit("stopTyping", { username });
   });
 
-  // Handle disconnect
-  socket.on("disconnect", () => {
-    console.log("Socket disconnected:", socket.id);
+  // Disconnect
+  socket.on("disconnect", async (reason) => {
+    console.log("🔌 Socket disconnected:", socket.id, reason);
+    
+    if (!userId) return;
 
-    // Remove user from onlineUsers
-    for (const userId in onlineUsers) {
-      const index = onlineUsers[userId].channels.findIndex(() => true);
-      if (index !== -1) {
-        onlineUsers[userId].channels.splice(index, 1);
-      }
-      if (onlineUsers[userId].channels.length === 0) delete onlineUsers[userId];
+    // Mark user offline
+    try {
+      await userModel.findByIdAndUpdate(userId, { 
+        online: false, 
+        lastSeen: new Date() 
+      });
+      console.log("User marked offline:", username);
+    } catch (err) {
+      console.error("Failed to update offline status:", err);
     }
 
-    Object.keys(io.sockets.adapter.rooms).forEach((channelId) => {
-      const usersInChannel = Object.values(onlineUsers)
-        .filter(u => u.channels.includes(channelId))
-        .map(u => ({ username: u.username, online: true }));
+    // Cleanup
+    delete onlineUsers[userId];
 
-      io.to(channelId).emit("onlineUsers", usersInChannel);
+    // Update all channels
+    Object.keys(io.sockets.adapter.rooms).forEach((roomId) => {
+      if (roomId === socket.id) return; // Skip socket rooms
+      
+      const usersInChannel = Object.keys(onlineUsers)
+        .filter((id) => onlineUsers[id]?.channels?.includes(roomId))
+        .map((id) => ({
+          _id: id,
+          username: onlineUsers[id].username,
+          online: true,
+        }));
+
+      io.to(roomId).emit("onlineUsers", usersInChannel);
     });
   });
 });
 
-connectDB(process.env.MONGO_URL).then(() => console.log("MongoDb connected")).catch(() => console.log("MongoDb disconnected"));
+connectDB(process.env.MONGO_URL)
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("MongoDB failed:", err));
 
 app.use(express.json());
 app.use(cookieParser());
-app.use(
-  cors({
-    origin: "http://localhost:5173",
-    credentials: true,
-  })
-);
+app.use(cors({
+  origin: "http://localhost:5173",
+  credentials: true,
+}));
 
 app.use("/api", userRouter);
 app.use("/api/channels", auth, channelRouter);
 app.use("/api/messages", auth, messageRouter);
 
-server.listen(5000, () => console.log("Server running on 5000"));
+server.listen(5000, () => {
+  console.log("Server running on http://localhost:5000");
+});

@@ -1,10 +1,13 @@
 const express = require("express");
-const { handleLogin, handleSignup } = require("../controllers/user");
+const { handleLogin, handleSignup, handleGetUserProfile, handleUserLogout } = require("../controllers/user");
+const {auth} = require("../middleware/authMiddleware");
 
 const userRouter = express.Router();
 
 userRouter.post("/signup", handleSignup);
-userRouter.get("/login", handleLogin);
+userRouter.post("/login", handleLogin);
+userRouter.get("/profile", auth, handleGetUserProfile);
+userRouter.post("/logout", handleUserLogout);
 
 module.exports = {
     userRouter

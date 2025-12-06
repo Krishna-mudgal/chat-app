@@ -5,7 +5,7 @@ export default function JoinChannelModal({ onClose, onJoined }) {
   const [channelName, setChannelName] = useState("");
   const [password, setPassword] = useState("");
 
-  const [channelType, setChannelType] = useState(null); // public/private
+  const [channelType, setChannelType] = useState(null);
 
   // Step 1: check channel existence and type
   const handleNext = async () => {
@@ -24,12 +24,11 @@ export default function JoinChannelModal({ onClose, onJoined }) {
       if (!res.ok) {
         alert(data.message || "Channel not found");
       } else {
-        setChannelType(data.type); // public or private
+        setChannelType(data.type); 
         if (data.type === "public") {
-          // Join immediately
           handleJoin();
         } else {
-          setStep(2); // ask for password
+          setStep(2);
         }
       }
     } catch (err) {
@@ -56,7 +55,7 @@ export default function JoinChannelModal({ onClose, onJoined }) {
         alert(data.message || "Failed to join channel");
       } else {
         alert("Joined channel successfully");
-        onJoined(); // refresh channels in parent
+        onJoined();
         onClose();
       }
     } catch (err) {

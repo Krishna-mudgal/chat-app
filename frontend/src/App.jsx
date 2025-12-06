@@ -3,6 +3,7 @@ import Home from './pages/Home'
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import Channel from './pages/Channel';
+import Profile from './components/Profile';
 
 const router = createBrowserRouter([
   {
@@ -18,8 +19,12 @@ const router = createBrowserRouter([
     element: <Signup />
   },
   {
-    path: "channel",
+    path: "channels",
     element: <Channel />
+  },
+  {
+    path: "profile",
+    element: <Profile />
   }
 ])
 

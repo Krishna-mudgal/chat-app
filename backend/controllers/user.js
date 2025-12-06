@@ -15,7 +15,7 @@ const handleSignup = async (req, res) => {
             password: hash
         })
 
-        generateToken(user._id, res);
+        generateToken(user._id, user.username, res);
         res.json({
             message: "signup successfull"
         })
@@ -38,10 +38,14 @@ const handleLogin = async (req, res) => {
 
         const user = await userModel.findOne({username: username});
 
+        if (!user) {
+            return res.status(400).json({ message: "User not found" });
+        }
+
         const result = await bcrypt.compare(password, user.password);
 
         if(result) {
-            generateToken(user._id, res);
+            generateToken(user._id, user.username, res);
             return res.json({
                 message: "Login successfull"
             })
@@ -55,7 +59,23 @@ const handleLogin = async (req, res) => {
     }
 }
 
+const handleGetUserProfile = async (req, res) => {
+  try {
+    const user = await userModel.findById(req.user._id).select("-password");
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+const handleUserLogout = (req, res) => {
+  res.clearCookie("token");
+  res.json({ message: "Logged out successfully" });
+};
+
 module.exports = {
     handleLogin,
-    handleSignup
+    handleSignup,
+    handleGetUserProfile,
+    handleUserLogout
 }
