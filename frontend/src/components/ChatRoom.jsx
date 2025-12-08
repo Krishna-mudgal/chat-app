@@ -12,6 +12,8 @@ export default function ChatRoom({ channel }) {
   const [socketConnected, setSocketConnected] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [channelMembers, setChannelMembers] = useState([]);
+  const API = import.meta.env.BACKEND_API_URL;
+  const SOCKET = import.meta.env.BACKEND_URL;
 
   const messagesRef = useRef(null);
   const messagesEndRef = useRef(null);
@@ -20,7 +22,7 @@ export default function ChatRoom({ channel }) {
 
   const fetchChannelMembers = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/channels/${channel._id}`, {
+      const res = await fetch(`${API}/channels/${channel._id}`, {
         credentials: "include",
       });
       const data = await res.json();
@@ -45,7 +47,7 @@ export default function ChatRoom({ channel }) {
 
     console.log("🔌 Connecting socket for channel:", channel._id);
 
-    socket.current = io("http://localhost:5000", {
+    socket.current = io(`${SOCKET}`, {
       withCredentials: true,
       transports: ["websocket"],
     });
@@ -112,7 +114,7 @@ export default function ChatRoom({ channel }) {
     try {
       console.log("📥 Loading page:", pageNum);
       const res = await fetch(
-        `http://localhost:5000/api/messages/${channel._id}?page=${pageNum}`,
+        `${API}/messages/${channel._id}?page=${pageNum}`,
         { credentials: "include" }
       );
       const data = await res.json();
@@ -179,7 +181,7 @@ export default function ChatRoom({ channel }) {
       temp: true
     };
 
-    console.log("📤 OPTIMISTIC:", optimisticMsg);
+    // console.log("📤 OPTIMISTIC:", optimisticMsg);
     setMessages((prev) => [...prev, optimisticMsg]);
     setNewMessage("");
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -255,18 +257,40 @@ export default function ChatRoom({ channel }) {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-medium truncate">{member.username}</p>
-                        {member.online !== undefined && (
-                          <p className="text-sm text-gray-400">
-                            {member.online ? (
-                              <span className="flex items-center gap-1">
-                                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                Online
-                              </span>
-                            ) : (
-                              `Last seen recently`
-                            )}
-                          </p>
-                        )}
+                        {channelMembers.map((member) => (
+                          <div key={member._id} className="flex items-center gap-3 p-3 hover:bg-[#36393f] rounded-lg mb-2">
+                            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
+                              {member.username?.[0]?.toUpperCase() || "?"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-white font-medium truncate">{member.username}</p>
+                              
+                              {/* DEBUG: Log raw member data */}
+                              <pre className="text-xs text-gray-400 mt-1 p-1 bg-black/20 rounded">
+                                {JSON.stringify({
+                                  online: member.online,
+                                  lastSeen: member.lastSeen,
+                                  lastSeenType: typeof member.lastSeen,
+                                  hasLastSeen: !!member.lastSeen
+                                }, null, 2)}
+                              </pre>
+                              
+                              {/* Your existing logic */}
+                              {member.online ? (
+                                <span className="flex items-center gap-1">
+                                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                                  Online
+                                </span>
+                              ) : member.lastSeen ? (
+                                <span className="text-sm text-gray-400">
+                                  Last seen {new Date(member.lastSeen).toLocaleString()}
+                                </span>
+                              ) : (
+                                <span className="text-sm text-gray-400">Last seen recently</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                         {member.username === channel.admin?.username && (
                           <p className="text-sm text-purple-400">Channel Admin</p>
                         )}

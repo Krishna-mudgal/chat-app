@@ -4,7 +4,8 @@ export default function CreateChannel({ onClose, onCreated }) {
   const [name, setName] = useState("");
   const [type, setType] = useState("public");
   const [password, setPassword] = useState("");
-    const [description, setDescription] = useState("");
+  const [description, setDescription] = useState("");
+  const API = import.meta.env.BACKEND_API_URL;
 
   const handleCreate = async () => {
     if (!name.trim()) return alert("Channel name is required");
@@ -13,7 +14,7 @@ export default function CreateChannel({ onClose, onCreated }) {
       return alert("Password is required for private channel");
 
     try {
-      const res = await fetch("http://localhost:5000/api/channels/create", {
+      const res = await fetch(`${API}/channels/create`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

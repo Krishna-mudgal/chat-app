@@ -4,6 +4,7 @@ export default function JoinChannelModal({ onClose, onJoined }) {
   const [step, setStep] = useState(1); // 1 = enter name, 2 = enter password
   const [channelName, setChannelName] = useState("");
   const [password, setPassword] = useState("");
+  const API = import.meta.env.BACKEND_API_URL;
 
   const [channelType, setChannelType] = useState(null);
 
@@ -13,7 +14,7 @@ export default function JoinChannelModal({ onClose, onJoined }) {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/channels/check?name=${channelName}`,
+        `${API}/channels/check?name=${channelName}`,
         {
           method: "GET",
           credentials: "include",
@@ -39,7 +40,7 @@ export default function JoinChannelModal({ onClose, onJoined }) {
   // Step 2: join channel
   const handleJoin = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/channels/join", {
+      const res = await fetch(`${API}/channels/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

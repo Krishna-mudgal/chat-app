@@ -10,12 +10,12 @@ export default function Channels() {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const API = import.meta.env.BACKEND_API_URL;
 
 
-  // Load channels for current user
     const loadMyChannels = async () => {
     try {
-        const res = await fetch("http://localhost:5000/api/channels/my", {
+        const res = await fetch(`${API}/channels/my`, {
         method: "GET",
         credentials: "include",
         });
