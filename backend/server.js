@@ -18,7 +18,7 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "*",
     credentials: true,
     methods: ["GET", "POST"]
   }
@@ -183,7 +183,7 @@ connectDB(process.env.MONGO_URL)
 app.use(express.json());
 app.use(cookieParser());
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: true,
   credentials: true,
 }));
 
