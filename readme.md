@@ -75,10 +75,9 @@ cd backend
 npm install
 ```
 ### 2. Create a .env file
-- PORT=8800
 - MONGO_URL=your_mongodb_connection_url
 - SECRET_KEY=your_jwt_secret
-- CLIENT_URL=http://localhost:5173
+- FRONTEND_URL=your_frontend_url
 
 ### 3. Start the backend
 ```bash
@@ -94,8 +93,8 @@ npm install
 
 ### 2. Create a .env file
 ```ini
-VITE_API_URL=http://localhost:8800/api
-VITE_SOCKET_URL=http://localhost:8800
+VITE_BACKEND_API_URL=your_backend_url/api
+VITE_BACKEND_SOCKET_URL=your_backend_url
 ```
 
 ### 3. Start the frontend
@@ -154,3 +153,8 @@ GET  /api/messages/:channelId?page=1&limit=20
 - Import the frontend folder
 - Add environment variables
 - Deploy
+
+## Live Demo
+
+- Frontend: https://chat-app-gilt-tau-39.vercel.app
+- Backend API: https://chat-app-6ind.onrender.com
