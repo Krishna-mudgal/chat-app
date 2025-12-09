@@ -246,57 +246,45 @@ export default function ChatRoom({ channel }) {
 
             <div className="p-4 max-h-[50vh] overflow-y-auto">
               {channelMembers.length === 0 ? (
-                  <div className="text-center py-12 text-gray-400">
-                    {channel.type === "public" ? "No members" : "Loading..."}
-                  </div>
-                ) : (
-                  channelMembers.map((member) => (
-                    <div key={member._id} className="flex items-center gap-3 p-3 hover:bg-[#36393f] rounded-lg mb-2">
-                      <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
-                        {member.username?.[0]?.toUpperCase() || "?"}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-medium truncate">{member.username}</p>
-                        {channelMembers.map((member) => (
-                          <div key={member._id} className="flex items-center gap-3 p-3 hover:bg-[#36393f] rounded-lg mb-2">
-                            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
-                              {member.username?.[0]?.toUpperCase() || "?"}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-white font-medium truncate">{member.username}</p>
-                              
-                              {/* DEBUG: Log raw member data */}
-                              <pre className="text-xs text-gray-400 mt-1 p-1 bg-black/20 rounded">
-                                {JSON.stringify({
-                                  online: member.online,
-                                  lastSeen: member.lastSeen,
-                                  lastSeenType: typeof member.lastSeen,
-                                  hasLastSeen: !!member.lastSeen
-                                }, null, 2)}
-                              </pre>
-                              
-                              {/* Your existing logic */}
-                              {member.online ? (
-                                <span className="flex items-center gap-1">
-                                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                                  Online
-                                </span>
-                              ) : member.lastSeen ? (
-                                <span className="text-sm text-gray-400">
-                                  Last seen {new Date(member.lastSeen).toLocaleString()}
-                                </span>
-                              ) : (
-                                <span className="text-sm text-gray-400">Last seen recently</span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                        {member.username === channel.admin?.username && (
-                          <p className="text-sm text-purple-400">Channel Admin</p>
-                        )}
-                      </div>
+                <div className="text-center py-12 text-gray-400">
+                  {channel.type === "public" ? "No members" : "Loading..."}
+                </div>
+              ) : (
+                channelMembers.map((member) => (
+                  <div
+                    key={member._id}
+                    className="flex items-center gap-3 p-3 hover:bg-[#36393f] rounded-lg mb-2"
+                  >
+                    <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold">
+                      {member.username?.[0]?.toUpperCase() || "?"}
                     </div>
-                  ))
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">
+                        {member.username}
+                      </p>
+
+                      {member.online ? (
+                        <span className="flex items-center gap-1 text-sm text-green-400">
+                          <span className="w-2 h-2 bg-green-400 rounded-full" />
+                          Online
+                        </span>
+                      ) : member.lastSeen ? (
+                        <span className="text-sm text-gray-400">
+                          Last seen {new Date(member.lastSeen).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">
+                          Last seen recently
+                        </span>
+                      )}
+
+                      {member.username === channel.admin?.username && (
+                        <p className="text-sm text-purple-400 mt-1">Channel Admin</p>
+                      )}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </div>

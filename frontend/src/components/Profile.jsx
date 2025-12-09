@@ -11,6 +11,7 @@ export default function Profile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
+        console.log(API);
         setLoading(true);
         const res = await fetch(`${API}/profile`, {
           credentials: "include",
