@@ -6,7 +6,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const API = import.meta.env.BACKEND_API_URL;
+  const API = import.meta.env.VITE_BACKEND_API_URL;
 
   useEffect(() => {
     const fetchProfile = async () => {

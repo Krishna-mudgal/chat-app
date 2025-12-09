@@ -5,7 +5,7 @@ export default function CreateChannel({ onClose, onCreated }) {
   const [type, setType] = useState("public");
   const [password, setPassword] = useState("");
   const [description, setDescription] = useState("");
-  const API = import.meta.env.BACKEND_API_URL;
+  const API = import.meta.env.VITE_BACKEND_API_URL;
 
   const handleCreate = async () => {
     if (!name.trim()) return alert("Channel name is required");

@@ -12,8 +12,8 @@ export default function ChatRoom({ channel }) {
   const [socketConnected, setSocketConnected] = useState(false);
   const [showMembersModal, setShowMembersModal] = useState(false);
   const [channelMembers, setChannelMembers] = useState([]);
-  const API = import.meta.env.BACKEND_API_URL;
-  const SOCKET = import.meta.env.BACKEND_URL;
+  const API = import.meta.env.VITE_BACKEND_API_URL;
+  const SOCKET = import.meta.env.VITE_BACKEND_SOCKET_URL;
 
   const messagesRef = useRef(null);
   const messagesEndRef = useRef(null);

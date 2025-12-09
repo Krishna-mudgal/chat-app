@@ -5,7 +5,7 @@ export default function Signup() {
   const [form, setForm] = useState({ username: "", password: "" });
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const API = import.meta.env.BACKEND_API_URL;
+  const API = import.meta.env.VITE_BACKEND_API_URL;
 
   const handleSignup = async (e) => {
     e.preventDefault();

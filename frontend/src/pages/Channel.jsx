@@ -10,7 +10,7 @@ export default function Channels() {
   const navigate = useNavigate();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
-  const API = import.meta.env.BACKEND_API_URL;
+  const API = import.meta.env.VITE_BACKEND_API_URL;
 
 
     const loadMyChannels = async () => {

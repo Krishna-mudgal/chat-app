@@ -4,7 +4,7 @@ export default function JoinChannelModal({ onClose, onJoined }) {
   const [step, setStep] = useState(1); // 1 = enter name, 2 = enter password
   const [channelName, setChannelName] = useState("");
   const [password, setPassword] = useState("");
-  const API = import.meta.env.BACKEND_API_URL;
+  const API = import.meta.env.VITE_BACKEND_API_URL;
 
   const [channelType, setChannelType] = useState(null);
 
