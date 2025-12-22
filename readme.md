@@ -1,4 +1,4 @@
-# Real-Time Chat Application  
+# [🔗]( https://chat-app-gilt-tau-39.vercel.app) Real-Time Chat Application
 (Node.js, Express, MongoDB, Socket.io, React)
 
 A full-stack real-time chat platform supporting public and private channels, real-time messaging, online user tracking, and secure authentication using JWT stored in HTTP-only cookies.
